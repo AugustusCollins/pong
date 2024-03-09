@@ -4,377 +4,357 @@ import math
 import sys
 
 
-class Pong:
+class Main:
     """main game class"""
 
     def __init__(self):
-        """initialize pygame, game screen and other game attribute"""
-
-        # initialize pygame resources
+        # initialize pygame
         pygame.init()
-        # set screen, window size
+
+        # set window size, and title
         self.screen = pygame.display.set_mode((640, 360))
-        # set window title bar text
+        self.screen_rect = self.screen.get_rect()
         pygame.display.set_caption("Pong")
 
         # background color
         self.br_color = "#050103"
-        # clock object to handle time sensitive data and operations
+        # clock object to handle time related data and operations
         self.clock = pygame.time.Clock()
 
-        # instantiate players #
-        self.player1 = Paddle(self, 1)
-        self.player2 = Paddle(self, 2)
+        # initialize players #
+        self.left_player = Player("left", self.screen, self.screen_rect)
+        self.right_player = Player("right", self.screen, self.screen_rect)
 
-        # instantiate center line #
-        self.center_line = CenterLine(self)
+        # initialize center line #
+        self.center_line = CenterLine(self.screen, self.screen_rect)
 
-        # instantiate score labels #
-        self.score1 = ScoreLabel(self, 0, 1)
-        self.score2 = ScoreLabel(self, 0, 2)
+        # initialize score labels #
+        self.left_score_label = ScoreLabel(0, "left", self.screen, self.screen_rect)
+        self.right_score_label = ScoreLabel(0, "right", self.screen, self.screen_rect)
 
-        # instantiate ball #
-        self.ball = Ball(self)
+        # initialize ball #
+        self.ball = Ball(self.screen, self.screen_rect)
 
-        # instantiate sound effects #
-        self.hit_sound = SFX("hit.mp3")
-        self.score_sound = SFX("score.mp3")
+        # initialize manager #
+        self.manager = Manager(self)
 
     def run(self):
         """game loop"""
-
         while True:
             self.check_input()
             self.update()
             self.render()
 
-            # make sure loop is called 60 times per second
+            # make sure game loop is called 60 times per second
             self.clock.tick(60)
 
     def check_input(self):
-        """input event loop: handles users input"""
+        """check for user inputs using an event loop"""
         for event in pygame.event.get():
-            # stop program if the window close button is pressed
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN:
-                self.key_pressed(event.key)
+                # key pressed method #
+                self.manager.key_pressed(event.key)
             elif event.type == pygame.KEYUP:
-                self.key_released(event.key)
-
-    def key_pressed(self, key):
-        """handle keydown events"""
-        if key == pygame.K_w:
-            # start moving player one up #
-            self.player1.moving_up = True
-        elif key == pygame.K_UP:
-            # start moving player two up #
-            self.player2.moving_up = True
-        elif key == pygame.K_s:
-            # start moving player one down #
-            self.player1.moving_down = True
-        elif key == pygame.K_DOWN:
-            # start moving player two down #
-            self.player2.moving_down = True
-        elif key == pygame.K_SPACE:
-            # start game when the space button is pressed
-            self.new_game()
-
-    def key_released(self, key):
-        """handle keyup events"""
-        if key == pygame.K_w:
-            # stop moving player one up #
-            self.player1.moving_up = False
-        elif key == pygame.K_UP:
-            # stop moving player two up #
-            self.player2.moving_up = False
-        elif key == pygame.K_s:
-            # stop moving player one down #
-            self.player1.moving_down = False
-        elif key == pygame.K_DOWN:
-            # stop moving player two down #
-            self.player2.moving_down = False
-
-    def new_game(self):
-        """start a new game"""
-        # center player one #
-        self.player1.set_position()
-        # center player two #
-        self.player2.set_position()
-        # reset player one score #
-        self.score1.reset()
-        # reset player two score #
-        self.score2.reset()
-        # position ball to center of screen #
-        self.ball.start()
-
-    def point(self, player):
-        """add point when a player scores"""
-        if player == 1:
-            # add point to player one #
-            self.score1.add()
-        elif player == 2:
-            # add point to player two #
-            self.score2.add()
-        # position ball to center of screen #
-        self.ball.start()
-        # play score sound effect #
-        self.score_sound.play()
-
-    def play_hit_sound(self):
-        """hit sound effect"""
-        # play sound effect when ball hits wall or paddle #
-        self.hit_sound.play()
+                # key released method #
+                self.manager.key_released(event.key)
 
     def update(self):
-        """updates game elements"""
+        """update game elements"""
+        # update players #
+        self.left_player.update()
+        self.right_player.update()
+
+        # update manager #
+        self.manager.update()
+
         # update ball #
         self.ball.update()
 
-        # update players #
-        self.player1.update()
-        self.player2.update()
-
     def render(self):
-        """draws game elements to the screen"""
-
-        # fill window with background color
+        """render game elements to the screen"""
+        # set background color
         self.screen.fill(self.br_color)
 
-        # draw score labels #
-        self.score1.render()
-        self.score2.render()
+        # render players #
+        self.left_player.render()
+        self.right_player.render()
 
-        # draw center line #
+        # render center line #
         self.center_line.render()
 
-        # draw players #
-        self.player1.render()
-        self.player2.render()
+        # render score labels #
+        self.left_score_label.render()
+        self.right_score_label.render()
 
-        # draw ball #
+        # render ball #
         self.ball.render()
 
-        # show latest frame
+        # show most recent frame
         pygame.display.flip()
 
 
-class Paddle:
-    """paddle class"""
+class Player:
+    """player/paddle class"""
 
-    def __init__(self, pong, player, width=8, height=96, margin=10):
-        # get game screen surface
-        self.parent_surf = pong.screen
-        # get game screen rectangle/size
-        self.parent_rect = pong.screen.get_rect()
+    def __init__(self, side, screen, screen_rect, width=8, height=96, margin=10):
+        # which player? either left or right
+        self.side = side
 
-        # paddle rectangle
-        self.rect = pygame.Rect(0, 0, width, height)
-        self.player = player
+        # screen attributes
+        self.screen = screen
+        self.screen_rect = screen_rect
 
-        # paddle color
-        self.color = None
-        # space between paddle and wall
+        # players rect and margin
+        self.color = ""
         self.margin = margin
+        self.rect = pygame.Rect(0, 0, width, height)
 
-        # movement speed
-        self.speed = 2
-
-        # movement flags
+        # movement_flags
         self.moving_up = False
         self.moving_down = False
+
+        self.speed = 2
 
         self.set_position()
 
     def set_position(self):
-        """set paddle position according to it's side"""
-        if self.player == 1:
+        """set player position and color according the player's side"""
+        if self.side == "left":
             self.color = "#c92631"
-            self.rect.midleft = self.parent_rect.midleft
+            self.rect.midleft = self.screen_rect.midleft
             # add margin
             self.rect.x += self.margin
-        elif self.player == 2:
+        elif self.side == "right":
             self.color = "#1a7827"
-            self.rect.midright = self.parent_rect.midright
+            self.rect.midright = self.screen_rect.midright
             # add margin
             self.rect.x -= self.margin
 
     def update(self):
-        """handle paddle movement and collisions"""
+        """move player accordingly"""
         if self.moving_up and self.rect.top > 0:
             self.rect.y -= self.speed
-        if self.moving_down and self.rect.bottom < self.parent_rect.bottom:
+        if self.moving_down and self.rect.bottom < self.screen_rect.bottom:
             self.rect.y += self.speed
 
     def render(self):
-        """draw paddle to screen"""
-        pygame.draw.rect(self.parent_surf, self.color, self.rect)
+        """draw player on screen"""
+        pygame.draw.rect(self.screen, self.color, self.rect)
 
 
 class CenterLine:
-    """draws a line at the center of the screen"""
+    """line at the center of the screen"""
 
-    def __init__(self, pong):
-        # get game screen
-        self.parent_surf = pong.screen
-        # get game screen rect
-        self.parent_rect = pong.screen.get_rect()
+    def __init__(self, screen, screen_rect):
+        # screen properties
+        self.screen = screen
+        self.screen_rect = screen_rect
 
-        # line's color
+        # line color, start position and end position
         self.color = "#91896e"
-        # set line position
-        self.line_start_pos = (self.parent_rect.centerx, 0)
-        self.line_end_pos = (self.parent_rect.centerx, self.parent_rect.height)
+        self.start_pos = self.screen_rect.midtop
+        self.end_pos = self.screen_rect.midbottom
 
     def render(self):
         """draw line on screen"""
-        pygame.draw.line(self.parent_surf, self.color, self.line_start_pos, self.line_end_pos)
+        pygame.draw.line(self.screen, self.color, self.start_pos, self.end_pos)
 
 
 class ScoreLabel:
-    """displays player score on screen"""
+    """render score text on screen"""
 
-    def __init__(self, pong, text, player, margin=32):
-        # get game screen
-        self.parent_surf = pong.screen
-        # get game screen rect
-        self.parent_rect = pong.screen.get_rect()
-
-        self.player = player
+    def __init__(self, text, side, screen, screen_rect, margin=32):
+        # set which side of the screen and margin
+        self.side = side
         self.margin = margin
 
-        self.font = pygame.font.Font(None, 32)
-        self.color = "#403830"
+        # screen attributes
+        self.screen = screen
+        self.screen_rect = screen_rect
 
+        # font color and object
+        self.color = "#403830"
+        self.font = pygame.font.Font(None, 32)
+
+        # label surface, and rect
         self.surf = None
         self.rect = None
+        self.set_text(text)
 
-        self.score = int(text)
-        self.set_text()
-
-    def set_text(self):
-        """set text"""
-        self.surf = self.font.render(str(self.score), True, self.color)
+    def set_text(self, text):
+        """set score label text and position it on screen accordingly"""
+        self.surf = self.font.render(str(text), True, self.color)
         self.rect = self.surf.get_rect()
-        self.rect.y += self.margin
+        self.rect.centery = self.margin
 
-        if self.player == 1:
-            self.rect.right = self.parent_rect.centerx - self.margin
-        elif self.player == 2:
-            self.rect.left = self.parent_rect.centerx + self.margin
-
-    def add(self):
-        """add point to score"""
-        self.score += 1
-        self.set_text()
-
-    def reset(self):
-        """reset point to zero"""
-        self.score = 0
-        self.set_text()
+        if self.side == "left":
+            self.rect.centerx = self.screen_rect.centerx - self.margin
+        elif self.side == "right":
+            self.rect.centerx = self.screen_rect.centerx + self.margin
 
     def render(self):
-        """draw score label to screen"""
-        self.parent_surf.blit(self.surf, self.rect)
+        """draw score label on screen"""
+        self.screen.blit(self.surf, self.rect)
 
 
 class Ball:
     """ball class"""
 
-    def __init__(self, pong, size=8):
-        # reference to game instance
-        self.pong = pong
-        # reference to players
-        self.player1 = pong.player1
-        self.player2 = pong.player2
+    def __init__(self, screen, screen_rect, radius=5):
+        # screen attributes
+        self.screen = screen
+        self.screen_rect = screen_rect
 
-        # get game screen
-        self.parent_surf = pong.screen
-        # get game screen rect
-        self.parent_rect = pong.screen.get_rect()
-
-        # ball's color
+        # ball position, radius, and color
+        self.x = self.screen_rect.centerx
+        self.y = self.screen_rect.centery
+        self.radius = radius
         self.color = "#f5d776"
 
-        # ball's rectangle
-        self.rect = pygame.Rect(0, 0, size, size)
-        self.center_ball()
-
-        # ball's speed and direction
+        # ball speed and direction
         self.speed = 3
-        self.direction = [0.5, 0.5]
+        self.direction = [0, 0]
 
     def center_ball(self):
         """position ball at the center of the screen"""
-        self.rect.center = self.parent_rect.center
-
-    def start(self):
-        """start game"""
-        self.center_ball()
-        dir_x, dir_y = self.normalize_vector(random.randint(-5, 5), random.randint(-5, 5))
-        self.direction = [dir_x, dir_y]
-
-    @staticmethod
-    def normalize_vector(x, y):
-        """returns a normalized vector"""
-        mag = math.sqrt(x*x + y*y)
-        if mag == 0:
-            return x, y
-        return (x/mag), (y/mag)
+        self.x = self.screen_rect.centerx
+        self.y = self.screen_rect.centery
 
     def update(self):
-        """handle ball movement and collision"""
-        self.player_collision()
-        self.wall_collision()
-        self.move()
-
-    def player_collision(self):
-        """check for collision with players"""
-        # player one
-        if self.rect.colliderect(self.player1.rect):
-            self.direction[0] = abs(self.direction[0])
-            self.pong.play_hit_sound()
-        elif self.rect.colliderect(self.player2.rect):
-            self.direction[0] = -abs(self.direction[0])
-            self.pong.play_hit_sound()
-
-    def wall_collision(self):
-        """handle wall collision"""
-        # top wall
-        if self.rect.top < 0:
-            self.direction[1] = abs(self.direction[1])
-            self.pong.play_hit_sound()
-        # bottom wall
-        if self.rect.bottom > self.parent_rect.bottom:
-            self.direction[1] = -abs(self.direction[1])
-            self.pong.play_hit_sound()
-        # left wall
-        if self.rect.right < 0:
-            self.pong.point(2)
-        # right wall
-        if self.rect.left > self.parent_rect.right:
-            self.pong.point(1)
-
-    def move(self):
-        """move ball"""
-        self.rect.x += self.direction[0] * self.speed
-        self.rect.y += self.direction[1] * self.speed
+        """move ball according to its direction and speed"""
+        self.x += self.direction[0] * self.speed
+        self.y += self.direction[1] * self.speed
 
     def render(self):
-        """draw ball to the screen"""
-        pygame.draw.rect(self.parent_surf, self.color, self.rect)
+        """draw ball on screen"""
+        pygame.draw.circle(self.screen, self.color, (self.x, self.y), self.radius)
 
 
-class SFX:
-    """sound effect player"""
-    def __init__(self, sound):
-        self.sound = pygame.mixer.Sound(sound)
+class Manager:
+    """manages game data and operations like player scores, and user input"""
 
-    def play(self):
-        """play sound effect"""
-        pygame.mixer.Sound.play(self.sound)
+    def __init__(self, main):
+        # reference to main game object
+        self.main = main
+
+        # player scores
+        self.left_score = 0
+        self.right_score = 0
+
+    def key_pressed(self, key):
+        """manages key down events"""
+        if key == pygame.K_w:
+            # start moving left player up
+            self.main.left_player.moving_up = True
+        elif key == pygame.K_UP:
+            # start moving right player up
+            self.main.right_player.moving_up = True
+        elif key == pygame.K_s:
+            # start moving left player down
+            self.main.left_player.moving_down = True
+        elif key == pygame.K_DOWN:
+            # start moving right player down
+            self.main.right_player.moving_down = True
+        elif key == pygame.K_SPACE:
+            self.new_game()
+
+    def key_released(self, key):
+        """manages key up events"""
+        if key == pygame.K_w:
+            # stop moving left player up
+            self.main.left_player.moving_up = False
+        elif key == pygame.K_UP:
+            # stop moving right player up
+            self.main.right_player.moving_up = False
+        elif key == pygame.K_s:
+            # stop moving left player down
+            self.main.left_player.moving_down = False
+        elif key == pygame.K_DOWN:
+            # stop moving right player down
+            self.main.right_player.moving_down = False
+
+    def new_game(self):
+        """start a new game"""
+        self.left_score = 0
+        self.right_score = 0
+        self.main.left_score_label.set_text(self.left_score)
+        self.main.right_score_label.set_text(self.right_score)
+        self.main.left_player.set_position()
+        self.main.right_player.set_position()
+        self.shoot_ball()
+
+    def shoot_ball(self):
+        """shoot ball at a random angle"""
+        self.main.ball.center_ball()
+
+        angle = random.randint(0, 360)
+        x = math.cos(angle)
+        y = math.sin(angle)
+
+        self.main.ball.direction = [x, y]
+
+    def update(self):
+        self.ball_wall_collision()
+        self.ball_player_collision()
+
+    def ball_wall_collision(self):
+        """handle ball collisions"""
+        ball = self.main.ball
+        if (ball.y - ball.radius) < 0:
+            # top wall
+            ball.direction[1] = abs(ball.direction[1])
+        elif (ball.y + ball.radius) > ball.screen_rect.bottom:
+            # bottom wall
+            ball.direction[1] = -abs(ball.direction[1])
+        elif ball.x < 0:
+            # left side
+            self.score_player("right")
+        elif ball.x > self.main.screen_rect.right:
+            # right side
+            self.score_player("left")
+
+    def score_player(self, side):
+        """add point to player score"""
+        if side == "left":
+            self.left_score += 1
+            self.main.left_score_label.set_text(self.left_score)
+        elif side == "right":
+            self.right_score += 1
+            self.main.right_score_label.set_text(self.right_score)
+        self.shoot_ball()
+
+    def ball_player_collision(self):
+        ball = self.main.ball
+        if self.circle_rect(ball, self.main.left_player.rect):
+            ball.direction[0] = abs(ball.direction[0])
+        elif self.circle_rect(ball, self.main.right_player.rect):
+            ball.direction[0] = -abs(ball.direction[0])
+
+    @staticmethod
+    def circle_rect(circle, rect):
+        """detect collision between circle and rectangle"""
+        x = circle.x
+        y = circle.y
+
+        if circle.x < rect.x:
+            x = rect.x
+        elif circle.x > rect.x+rect.width:
+            x = rect.x+rect.width
+        if circle.y < rect.y:
+            y = rect.y
+        elif circle.y > rect.y+rect.height:
+            y = rect.y+rect.height
+
+        a = circle.x-x
+        b = circle.y-y
+        distance = math.sqrt(a*a + b*b)
+
+        if distance < circle.radius:
+            return True
+        return False
 
 
-# create and run an instance of pong
-Pong().run()
+Main().run()
